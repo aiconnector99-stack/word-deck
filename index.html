@@ -167,10 +167,12 @@ function parseCSV(text){
   return rows.map(r=>({w:(r[iw]||"").trim(),s:is<0?"":(r[is]||"").trim(),d:(r[id]||"").trim(),e:ie<0?"":(r[ie]||"").trim()})).filter(c=>c.w&&c.d);
 }
 async function fromSupabase(){
-  const res=await fetch(`${SUPABASE_URL}/rest/v1/Word?select=word,pronunciation,meaning,example`,{headers:{apikey:SUPABASE_KEY},cache:"no-store"});
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/WORD?select=*`,{headers:{apikey:SUPABASE_KEY},cache:"no-store"});
   if(!res.ok) throw new Error("supabase "+res.status);
   const rows=await res.json();
-  return rows.map(r=>({w:(r.word||"").trim(),s:(r.pronunciation||"").trim(),d:(r.meaning||"").trim(),e:(r.example||"").trim()})).filter(c=>c.w&&c.d);
+  // accept column names in any capitalization (word, Word, WORD...)
+  return rows.map(raw=>{const r={}; for(const k in raw) r[k.toLowerCase()]=raw[k]==null?"":String(raw[k]);
+    return {w:(r.word||"").trim(),s:(r.pronunciation||"").trim(),d:(r.meaning||"").trim(),e:(r.example||"").trim()};}).filter(c=>c.w&&c.d);
 }
 async function fromSheet(){
   const res=await fetch(SHEET_URL,{cache:"no-store"});
