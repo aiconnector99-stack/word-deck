@@ -246,7 +246,7 @@ $("add").onsubmit=async e=>{
   }catch(err){
     console.warn(err);
     custom.push(card); hidden.delete(w);
-    msg.textContent=`Couldn't reach the database, so “${w}” is saved on this device only.`;
+    msg.textContent=`The database didn't accept “${w}”, so it's saved on this device only. Details: ${String(err.message||err).slice(0,240)}`;
   }
   btn.disabled=false; btn.textContent="Add to deck";
   form.reset(); save(); compose(); resetStudy();
