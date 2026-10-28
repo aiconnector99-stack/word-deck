@@ -101,14 +101,15 @@ ul.list .dot.ok{background:var(--good)}
   </div>
 
   <section>
-    <h3>Add a word on this device</h3>
-    <p class="src" style="margin:-4px 0 10px">To add a word everywhere, add a row to your Google Sheet.</p>
+    <h3>Add a new word</h3>
+    <p class="src" style="margin:-4px 0 10px">Words you add here are shared with everyone who uses the app.</p>
     <form id="add">
-      <input id="nWord" placeholder="Word" required>
-      <input id="nSay" placeholder="How to say it (optional)">
-      <input id="nDef" class="full" placeholder="What it means" required>
-      <input id="nEx" class="full" placeholder="Example sentence (optional)">
+      <input id="nWord" placeholder="Word" required maxlength="60">
+      <input id="nSay" placeholder="How to say it (optional)" maxlength="80">
+      <input id="nDef" class="full" placeholder="What it means" required maxlength="300">
+      <input id="nEx" class="full" placeholder="Example sentence (optional)" maxlength="300">
       <button class="btn primary full" type="submit">Add to deck</button>
+      <p class="src full" id="addMsg" role="status" style="margin:0"></p>
     </form>
   </section>
 
@@ -227,11 +228,28 @@ $("again").onclick=()=>{if(!cur)return; queue.push(queue.shift()); show();};
 $("shuffle").onclick=()=>{shuffle(queue); show();};
 $("restart").onclick=()=>{known.clear(); save(); resetStudy(); shuffle(queue); show();};
 $("list").onclick=e=>{const b=e.target.closest(".x"); if(!b)return; const c=deck[+b.dataset.i]; const ci=custom.indexOf(c); if(ci>=0)custom.splice(ci,1); else hidden.add(c.w); known.delete(c.w); save(); compose(); resetStudy();};
-$("add").onsubmit=e=>{
+$("add").onsubmit=async e=>{
   e.preventDefault();
-  const w=$("nWord").value.trim(), d=$("nDef").value.trim(); if(!w||!d)return;
-  custom.push({w,s:$("nSay").value.trim(),d,e:$("nEx").value.trim()}); hidden.delete(w);
-  e.target.reset(); save(); compose(); resetStudy();
+  const form=e.target, btn=form.querySelector("button[type=submit]"), msg=$("addMsg");
+  const w=$("nWord").value.trim(), d=$("nDef").value.trim(), sy=$("nSay").value.trim(), ex=$("nEx").value.trim();
+  if(!w||!d)return;
+  if(deck.some(c=>c.w.toLowerCase()===w.toLowerCase())){msg.textContent=`“${w}” is already in the deck.`;return;}
+  btn.disabled=true; btn.textContent="Adding…"; msg.textContent="";
+  const card={w,s:sy,d,e:ex};
+  try{
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/WORD`,{method:"POST",
+      headers:{apikey:SUPABASE_KEY,"Content-Type":"application/json",Prefer:"return=minimal"},
+      body:JSON.stringify({word:w,pronunciation:sy||null,meaning:d,example:ex||null})});
+    if(!res.ok) throw new Error(res.status+" "+await res.text());
+    base.push(card); hidden.delete(w);
+    msg.textContent=`Added “${w}” for everyone.`;
+  }catch(err){
+    console.warn(err);
+    custom.push(card); hidden.delete(w);
+    msg.textContent=`Couldn't reach the database, so “${w}” is saved on this device only.`;
+  }
+  btn.disabled=false; btn.textContent="Add to deck";
+  form.reset(); save(); compose(); resetStudy();
 };
 document.addEventListener("keydown",e=>{
   if(e.target.tagName==="INPUT")return;
