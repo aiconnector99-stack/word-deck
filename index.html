@@ -1,0 +1,188 @@
+<title>Word Deck</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one centered study column — progress strip, a big flip card, then answer buttons; word list + add form below */
+:root{
+  --bg:#eef1f6; --surface:#ffffff; --ink:#1c2433; --muted:#5d6779; --line:#d4dae5;
+  --accent:#2f5bd3; --accent-ink:#ffffff; --hi:#f2c230; --good:#1f8a5b; --again:#c2410c;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121722; --surface:#1b2230; --ink:#e7ebf3; --muted:#9aa4b6; --line:#2e3748;
+  --accent:#7c9cf5; --accent-ink:#0d1220; --hi:#e8b923; --good:#4cc38a; --again:#f08a5d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121722; --surface:#1b2230; --ink:#e7ebf3; --muted:#9aa4b6; --line:#2e3748;
+  --accent:#7c9cf5; --accent-ink:#0d1220; --hi:#e8b923; --good:#4cc38a; --again:#f08a5d; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
+.wrap{max-width:620px;margin:0 auto;padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:22px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:700;font-size:1.9rem;margin:0;letter-spacing:-.01em}
+.count{font-family:var(--mono);font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--good);width:0;transition:width .3s}
+.card{perspective:1200px;cursor:pointer;min-height:300px;border:0;background:none;padding:0;text-align:inherit;color:inherit;font:inherit;width:100%}
+.card:focus-visible{outline:3px solid var(--accent);outline-offset:4px;border-radius:14px}
+.inner{position:relative;min-height:300px;transition:transform .5s;transform-style:preserve-3d}
+.card.flipped .inner{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 6px 24px rgb(20 30 60 / .08);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:10px;padding:28px;text-align:center}
+.face.back{transform:rotateY(180deg)}
+.face::before{content:"";position:absolute;left:0;right:0;top:46px;border-top:1px solid var(--line)}
+.tag{position:absolute;top:14px;left:20px;font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.word{font-family:var(--display);font-weight:700;font-size:clamp(2rem,8vw,2.9rem);line-height:1.1;overflow-wrap:anywhere;text-wrap:balance}
+.word mark{background:linear-gradient(transparent 62%,var(--hi) 62%);color:inherit;padding:0 .08em}
+.say{font-family:var(--mono);font-size:1rem;color:var(--accent)}
+.def{font-size:1.2rem;max-width:34ch;text-wrap:balance}
+.ex{font-style:italic;color:var(--muted);max-width:40ch}
+.hint{font-family:var(--mono);font-size:.78rem;color:var(--muted);position:absolute;bottom:14px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+button.btn{font-family:var(--display);font-weight:500;font-size:1rem;padding:14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+button.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.again{border-color:var(--again)!important;color:var(--again)!important}
+.got{background:var(--good)!important;border-color:var(--good)!important;color:var(--accent-ink)!important}
+.tools{display:flex;gap:10px;flex-wrap:wrap}
+.tools .btn{padding:9px 14px;font-size:.9rem}
+.done{text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center;padding:30px 10px}
+.done h2{font-family:var(--display);margin:0;font-size:1.6rem}
+section h3{font-family:var(--display);font-size:1.05rem;margin:0 0 10px}
+form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+form .full{grid-column:1/-1}
+input{font:inherit;font-size:.95rem;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);min-width:0}
+input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.primary{background:var(--accent)!important;border-color:var(--accent)!important;color:var(--accent-ink)!important}
+ul.list{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+ul.list li{display:flex;gap:10px;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--line)}
+ul.list b{font-family:var(--display);font-weight:500}
+ul.list span{color:var(--muted);font-size:.9rem;flex:1;min-width:0}
+ul.list .dot{width:8px;height:8px;border-radius:50%;background:var(--line);flex:none;align-self:center}
+ul.list .dot.ok{background:var(--good)}
+.x{border:0;background:none;color:var(--muted);cursor:pointer;font-size:1rem}
+@media (max-width:440px){form{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.inner{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Word Deck</h1>
+    <span class="count" id="count"></span>
+  </header>
+  <div class="bar"><i id="bar"></i></div>
+
+  <div id="study">
+    <button class="card" id="card" aria-label="Flip card">
+      <div class="inner">
+        <div class="face front">
+          <span class="tag">Word</span>
+          <div class="word" id="fWord"></div>
+          <div class="say" id="fSay"></div>
+          <span class="hint">Tap to see the meaning</span>
+        </div>
+        <div class="face back">
+          <span class="tag">Meaning</span>
+          <div class="def" id="bDef"></div>
+          <div class="ex" id="bEx"></div>
+        </div>
+      </div>
+    </button>
+  </div>
+
+  <div class="actions" id="actions">
+    <button class="btn again" id="again">Study again</button>
+    <button class="btn got" id="got">I knew it</button>
+  </div>
+
+  <div class="tools">
+    <button class="btn" id="shuffle">Shuffle</button>
+    <button class="btn" id="restart">Start over</button>
+  </div>
+
+  <section>
+    <h3>Add a new word</h3>
+    <form id="add">
+      <input id="nWord" placeholder="Word" required>
+      <input id="nSay" placeholder="How to say it (optional)">
+      <input id="nDef" class="full" placeholder="What it means" required>
+      <input id="nEx" class="full" placeholder="Example sentence (optional)">
+      <button class="btn primary full" type="submit">Add to deck</button>
+    </form>
+  </section>
+
+  <section>
+    <h3>Your words</h3>
+    <ul class="list" id="list"></ul>
+  </section>
+</div>
+
+<script>
+const STARTER=[
+ {w:"anticlericalism",s:"an-tee-KLAIR-ih-kuh-liz-um",d:"Opposition to the power or influence of the clergy in public and political life.",e:"The movement's anticlericalism pushed the church out of the schools."},
+ {w:"dogma",s:"",d:"A belief or set of principles an authority treats as true and beyond question.",e:"She refused to accept company dogma without seeing the data."},
+ {w:"plaudits",s:"PLAW-dits",d:"Praise or enthusiastic approval.",e:"The team won plaudits for finishing the rollout early."},
+ {w:"bourgeoisie",s:"boor-zhwah-ZEE",d:"The middle class, especially as owners of property and capital.",e:"The novel mocks the comfortable habits of the bourgeoisie."},
+ {w:"proletariat",s:"proh-luh-TAIR-ee-ut",d:"Working-class people, especially those who earn wages.",e:"Marx wrote about the struggle of the proletariat."},
+ {w:"inimical",s:"ih-NIM-ih-kul",d:"Harmful or hostile; tending to get in the way.",e:"Constant interruptions are inimical to deep work."},
+ {w:"paradigmatic",s:"pair-uh-dig-MAT-ik",d:"Serving as a typical example or model of something.",e:"It's a paradigmatic case of scope creep."},
+ {w:"pejorative",s:"pih-JOR-uh-tiv",d:"Expressing contempt or disapproval.",e:"He used 'bureaucrat' in a pejorative sense."}
+];
+const KEY="word-deck-v1";
+let deck, known, queue, cur;
+function load(){
+  try{const raw=localStorage.getItem(KEY); if(raw){const o=JSON.parse(raw); deck=o.deck; known=new Set(o.known); return;}}catch(e){}
+  deck=STARTER.slice(); known=new Set();
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({deck,known:[...known]}))}catch(e){}}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+const $=id=>document.getElementById(id);
+const esc=t=>t.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function build(){queue=deck.filter(c=>!known.has(c.w));}
+function show(){
+  const card=$("card"); card.classList.remove("flipped");
+  $("count").textContent=`${known.size} of ${deck.length} known`;
+  $("bar").style.width=deck.length?(known.size/deck.length*100)+"%":"0";
+  renderList();
+  if(!queue.length){
+    $("study").innerHTML=`<div class="done"><h2>You know all ${deck.length} words.</h2><p>Add a new one below, or start over to review.</p></div>`;
+    $("actions").hidden=true; return;
+  }
+  cur=queue[0];
+  setTimeout(()=>{
+    $("fWord").innerHTML=`<mark>${esc(cur.w)}</mark>`;
+    $("fSay").textContent=cur.s||"";
+    $("bDef").textContent=cur.d;
+    $("bEx").textContent=cur.e?`“${cur.e}”`:"";
+  }, card.classList.contains("flipped")?0:0);
+}
+function resetStudy(){
+  if(!$("card")){
+    $("study").innerHTML=studyHTML; bindCard();
+  }
+  $("actions").hidden=false; build(); show();
+}
+function renderList(){
+  $("list").innerHTML=deck.map((c,i)=>`<li><i class="dot ${known.has(c.w)?"ok":""}" title="${known.has(c.w)?"Known":"Still learning"}"></i><b>${esc(c.w)}</b><span>${esc(c.d)}</span><button class="x" data-i="${i}" aria-label="Remove ${esc(c.w)}">×</button></li>`).join("");
+}
+const studyHTML=$("study").innerHTML;
+function bindCard(){$("card").onclick=()=>$("card").classList.toggle("flipped");}
+bindCard();
+$("got").onclick=()=>{if(!cur)return; known.add(cur.w); queue.shift(); save(); show();};
+$("again").onclick=()=>{if(!cur)return; queue.push(queue.shift()); show();};
+$("shuffle").onclick=()=>{shuffle(queue); show();};
+$("restart").onclick=()=>{known.clear(); save(); resetStudy(); shuffle(queue); show();};
+$("list").onclick=e=>{const b=e.target.closest(".x"); if(!b)return; const c=deck[+b.dataset.i]; deck.splice(+b.dataset.i,1); known.delete(c.w); save(); resetStudy();};
+$("add").onsubmit=e=>{
+  e.preventDefault();
+  const w=$("nWord").value.trim(), d=$("nDef").value.trim(); if(!w||!d)return;
+  deck.push({w,s:$("nSay").value.trim(),d,e:$("nEx").value.trim()});
+  e.target.reset(); save(); resetStudy();
+};
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT")return;
+  if(e.key===" "&&$("card")){e.preventDefault();$("card").classList.toggle("flipped");}
+  if(e.key==="ArrowRight")$("got").click();
+  if(e.key==="ArrowLeft")$("again").click();
+});
+load(); build(); show();
+</script>
