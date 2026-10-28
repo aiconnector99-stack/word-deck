@@ -130,6 +130,8 @@ const STARTER=[
  {w:"pejorative",s:"pih-JOR-uh-tiv",d:"Expressing contempt or disapproval.",e:"He used 'bureaucrat' in a pejorative sense."}
 ];
 const SHEET_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vSfyrCHQDlGfJ-K25XjelUt4tgRUyZbUpB3FnaO-K_--RlQJ0umhwhWOra4NzeWJgbK4rtRDckHcjLn/pub?output=csv";
+const SUPABASE_URL="https://ytpyhcpzesvfsgbtkson.supabase.co";
+const SUPABASE_KEY="sb_publishable_Ny_nHcDfJiQCwg9peFzjXw_W_qYZexa"; // public key, safe in web pages
 const KEY="word-deck-v2";
 // base = words from the Google Sheet (or the built-in list until it loads)
 // custom = words added in this browser; hidden = sheet words removed in this browser
@@ -164,17 +166,24 @@ function parseCSV(text){
   if(iw<0||id<0) throw new Error("missing headings");
   return rows.map(r=>({w:(r[iw]||"").trim(),s:is<0?"":(r[is]||"").trim(),d:(r[id]||"").trim(),e:ie<0?"":(r[ie]||"").trim()})).filter(c=>c.w&&c.d);
 }
+async function fromSupabase(){
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/words?select=word,pronunciation,meaning,example&order=created_at.asc`,{headers:{apikey:SUPABASE_KEY},cache:"no-store"});
+  if(!res.ok) throw new Error("supabase "+res.status);
+  const rows=await res.json();
+  return rows.map(r=>({w:(r.word||"").trim(),s:(r.pronunciation||"").trim(),d:(r.meaning||"").trim(),e:(r.example||"").trim()})).filter(c=>c.w&&c.d);
+}
+async function fromSheet(){
+  const res=await fetch(SHEET_URL,{cache:"no-store"});
+  if(!res.ok) throw new Error("sheet "+res.status);
+  return parseCSV(await res.text());
+}
+function useWords(words,label){base=words; save(); compose(); build(); show(); setSrc(`${words.length} words from ${label}`);}
 async function loadSheet(){
-  try{
-    const res=await fetch(SHEET_URL,{cache:"no-store"});
-    if(!res.ok) throw new Error(res.status);
-    const words=parseCSV(await res.text());
-    if(!words.length) throw new Error("empty");
-    base=words; save(); compose(); build(); show();
-    setSrc(`${words.length} words from your Google Sheet`);
-  }catch(e){
-    setSrc("Couldn't reach the Google Sheet, showing saved words");
-  }
+  try{ const w=await fromSupabase(); if(w.length) return useWords(w,"your Supabase database"); console.warn("Supabase returned no words"); }
+  catch(e){ console.warn(e); }
+  try{ const w=await fromSheet(); if(w.length) return useWords(w,"your Google Sheet (backup)"); }
+  catch(e){ console.warn(e); }
+  setSrc("Couldn't reach your word list, showing saved words");
 }
 function setSrc(t){const el=$("src"); if(el)el.textContent=t;}
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
@@ -228,5 +237,5 @@ document.addEventListener("keydown",e=>{
   if(e.key==="ArrowRight")$("got").click();
   if(e.key==="ArrowLeft")$("again").click();
 });
-load(); build(); show(); setSrc("Checking your Google Sheet…"); loadSheet();
+load(); build(); show(); setSrc("Loading your words…"); loadSheet();
 </script>
