@@ -10,6 +10,6 @@ It's a single `index.html` file with no setup needed. Open it in any browser.
 
 ## Where the words come from
 
-The app reads its word list from a Supabase table named `words` with the columns
+The app reads its word list from a Supabase table named `word` with the columns
 `word`, `pronunciation`, `meaning`, `example`. If Supabase can't be reached, it
 falls back to the published Google Sheet, then to the last list it loaded.
