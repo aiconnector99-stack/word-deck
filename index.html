@@ -22,6 +22,7 @@ header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
 h1{font-family:var(--display);font-weight:700;font-size:1.9rem;margin:0;letter-spacing:-.01em}
 .count{font-family:var(--mono);font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
 .bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.src{margin:-12px 0 0;font-family:var(--mono);font-size:.75rem;color:var(--muted)}
 .bar i{display:block;height:100%;background:var(--good);width:0;transition:width .3s}
 .card{perspective:1200px;cursor:pointer;min-height:300px;border:0;background:none;padding:0;text-align:inherit;color:inherit;font:inherit;width:100%}
 .card:focus-visible{outline:3px solid var(--accent);outline-offset:4px;border-radius:14px}
@@ -69,6 +70,7 @@ ul.list .dot.ok{background:var(--good)}
     <span class="count" id="count"></span>
   </header>
   <div class="bar"><i id="bar"></i></div>
+  <p class="src" id="src"></p>
 
   <div id="study">
     <button class="card" id="card" aria-label="Flip card">
@@ -99,7 +101,8 @@ ul.list .dot.ok{background:var(--good)}
   </div>
 
   <section>
-    <h3>Add a new word</h3>
+    <h3>Add a word on this device</h3>
+    <p class="src" style="margin:-4px 0 10px">To add a word everywhere, add a row to your Google Sheet.</p>
     <form id="add">
       <input id="nWord" placeholder="Word" required>
       <input id="nSay" placeholder="How to say it (optional)">
@@ -126,13 +129,54 @@ const STARTER=[
  {w:"paradigmatic",s:"pair-uh-dig-MAT-ik",d:"Serving as a typical example or model of something.",e:"It's a paradigmatic case of scope creep."},
  {w:"pejorative",s:"pih-JOR-uh-tiv",d:"Expressing contempt or disapproval.",e:"He used 'bureaucrat' in a pejorative sense."}
 ];
-const KEY="word-deck-v1";
-let deck, known, queue, cur;
+const SHEET_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vSfyrCHQDlGfJ-K25XjelUt4tgRUyZbUpB3FnaO-K_--RlQJ0umhwhWOra4NzeWJgbK4rtRDckHcjLn/pub?output=csv";
+const KEY="word-deck-v2";
+// base = words from the Google Sheet (or the built-in list until it loads)
+// custom = words added in this browser; hidden = sheet words removed in this browser
+let base=STARTER.slice(), custom=[], hidden=new Set(), known=new Set(), deck=[], queue, cur;
 function load(){
-  try{const raw=localStorage.getItem(KEY); if(raw){const o=JSON.parse(raw); deck=o.deck; known=new Set(o.known); return;}}catch(e){}
-  deck=STARTER.slice(); known=new Set();
+  try{
+    const raw=localStorage.getItem(KEY);
+    if(raw){const o=JSON.parse(raw); custom=o.custom||[]; hidden=new Set(o.hidden||[]); known=new Set(o.known||[]); if(o.sheet&&o.sheet.length)base=o.sheet;}
+    else{const old=localStorage.getItem("word-deck-v1"); if(old){const o=JSON.parse(old); known=new Set(o.known||[]); const names=new Set(STARTER.map(c=>c.w)); custom=(o.deck||[]).filter(c=>!names.has(c.w));}}
+  }catch(e){}
+  compose();
 }
-function save(){try{localStorage.setItem(KEY,JSON.stringify({deck,known:[...known]}))}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({custom,hidden:[...hidden],known:[...known],sheet:base}))}catch(e){}}
+function compose(){
+  const seen=new Set(); deck=[];
+  for(const c of [...base.filter(c=>!hidden.has(c.w)),...custom]){const k=c.w.toLowerCase(); if(!seen.has(k)){seen.add(k);deck.push(c);}}
+}
+function parseCSV(text){
+  const rows=[]; let row=[], f="", q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; } else f+=ch; }
+    else if(ch==='"') q=true;
+    else if(ch===','){row.push(f);f="";}
+    else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&text[i+1]==='\n')i++; row.push(f);rows.push(row);row=[];f=""; }
+    else f+=ch;
+  }
+  if(f||row.length){row.push(f);rows.push(row);}
+  const head=(rows.shift()||[]).map(h=>h.trim().toLowerCase());
+  const col=n=>head.indexOf(n);
+  const iw=col("word"), is=col("pronunciation"), id=col("meaning"), ie=col("example");
+  if(iw<0||id<0) throw new Error("missing headings");
+  return rows.map(r=>({w:(r[iw]||"").trim(),s:is<0?"":(r[is]||"").trim(),d:(r[id]||"").trim(),e:ie<0?"":(r[ie]||"").trim()})).filter(c=>c.w&&c.d);
+}
+async function loadSheet(){
+  try{
+    const res=await fetch(SHEET_URL,{cache:"no-store"});
+    if(!res.ok) throw new Error(res.status);
+    const words=parseCSV(await res.text());
+    if(!words.length) throw new Error("empty");
+    base=words; save(); compose(); build(); show();
+    setSrc(`${words.length} words from your Google Sheet`);
+  }catch(e){
+    setSrc("Couldn't reach the Google Sheet, showing saved words");
+  }
+}
+function setSrc(t){const el=$("src"); if(el)el.textContent=t;}
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 const $=id=>document.getElementById(id);
 const esc=t=>t.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -171,12 +215,12 @@ $("got").onclick=()=>{if(!cur)return; known.add(cur.w); queue.shift(); save(); s
 $("again").onclick=()=>{if(!cur)return; queue.push(queue.shift()); show();};
 $("shuffle").onclick=()=>{shuffle(queue); show();};
 $("restart").onclick=()=>{known.clear(); save(); resetStudy(); shuffle(queue); show();};
-$("list").onclick=e=>{const b=e.target.closest(".x"); if(!b)return; const c=deck[+b.dataset.i]; deck.splice(+b.dataset.i,1); known.delete(c.w); save(); resetStudy();};
+$("list").onclick=e=>{const b=e.target.closest(".x"); if(!b)return; const c=deck[+b.dataset.i]; const ci=custom.indexOf(c); if(ci>=0)custom.splice(ci,1); else hidden.add(c.w); known.delete(c.w); save(); compose(); resetStudy();};
 $("add").onsubmit=e=>{
   e.preventDefault();
   const w=$("nWord").value.trim(), d=$("nDef").value.trim(); if(!w||!d)return;
-  deck.push({w,s:$("nSay").value.trim(),d,e:$("nEx").value.trim()});
-  e.target.reset(); save(); resetStudy();
+  custom.push({w,s:$("nSay").value.trim(),d,e:$("nEx").value.trim()}); hidden.delete(w);
+  e.target.reset(); save(); compose(); resetStudy();
 };
 document.addEventListener("keydown",e=>{
   if(e.target.tagName==="INPUT")return;
@@ -184,5 +228,5 @@ document.addEventListener("keydown",e=>{
   if(e.key==="ArrowRight")$("got").click();
   if(e.key==="ArrowLeft")$("again").click();
 });
-load(); build(); show();
+load(); build(); show(); setSrc("Checking your Google Sheet…"); loadSheet();
 </script>
