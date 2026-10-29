@@ -1,0 +1,55 @@
+name: Build Android app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "android-app/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Capacitor
+        run: npm install --no-audit --no-fund
+
+      - name: Copy the web app in
+        run: |
+          mkdir -p www
+          cp ../index.html www/index.html
+
+      - name: Create the Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Build the app
+        working-directory: android-app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../../word-deck.apk
+
+      - name: Upload the app file
+        uses: actions/upload-artifact@v4
+        with:
+          name: word-deck-android
+          path: word-deck.apk
+          retention-days: 30
